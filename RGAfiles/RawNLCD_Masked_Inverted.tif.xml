@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata xml:lang="en"><Esri><CreaDate>20230216</CreaDate><CreaTime>12231100</CreaTime><ArcGISFormat>1.0</ArcGISFormat><SyncOnce>TRUE</SyncOnce><DataProperties><lineage><Process ToolSource="c:\program files (x86)\arcgis\desktop10.6\ArcToolbox\Toolboxes\Spatial Analyst Tools.tbx\RasterCalculator" Date="20230216" Time="122311">RasterCalculator (("RawNLCD_Masked_Clip21.tif" - 100)*-1)+0 D:\KAD\KAD_R_Project\RawNLCD_Masked_Inverted.tif</Process></lineage></DataProperties></Esri></metadata>
