@@ -1,0 +1,214 @@
+---
+title: "Watson_Opt"
+output: html_document
+date: "2022-12-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(raster)
+library(rgdal)          
+library(ggplot2)      
+library(dplyr)
+library(tidyr)
+library(readr)
+library(sf)
+library(gdistance)
+library(gstat)
+library(sp)
+library(scales)
+library(magrittr)
+library(automap)
+library(ResistanceGA)
+library(tidyverse)
+library(terra)
+library(ecodist)
+library(Matrix)
+library(tictoc)
+```
+
+##Data and set up files
+```{r raw data rasters}
+#This data is for optimization of ONLY STREAMS
+#Therefore, all data was masked by NHDPlus streams
+
+#In-stream conductivity measurements. Cells of streams without measurements were assigned a value of 100
+Cond<-raster("RGAfiles/Cond_Rescaled_Conduct.tif")
+plot(Cond)
+Cond
+
+#Percent forest cover created reclassifying NLCD raster to only have forest valus, then by doing a moving window analysis of 5x5
+NLCD<-raster("RGAfiles/RawNLCD_Masked_Clip21.tif")
+plot(NLCD)
+NLCD
+
+#Flow accumulation raster from NHDPlus as a proxy for StreamSize
+SS<-raster("RGAfiles/SS_Rescaled_Conduct.tif")
+plot(SS)
+SS
+
+#Slope raster from NHDPlus
+Slope<-raster("RGAfiles/Slope_Rescaled_Conduct.tif")
+plot(Slope)
+Slope
+
+#Elev raster from NHDPlus
+Elev<-raster("RGAfiles/Elev_Rescaled_Conduct.tif")
+plot(Elev)
+Elev
+
+#Culvert AOP score as assigned by SARP protocol, cells without culverts were assigned a value of 100, AOP scores were scaled from 0-1 to 1-100
+Culv<-raster("RGAfiles/AOPScaled4_Clip21.tif")
+plot(Culv)
+Culv
+
+
+```
+
+```{r run before optimization}
+write.dir <- "C:/Users/rwatson17/Desktop/Watson_Opt/MS/"
+# Give path to CIRCUITSCAPE .exe file
+JULIA_HOME <- "C:/Program Files/Julia-1.8.5/bin"
+JuliaCall::julia_setup(JULIA_HOME)
+#fst
+library(hierfstat)
+library(adegenet)
+Data <- read.genepop("RGAfiles/KAD_Watson_GenepopFile_12popNo519.gen") 
+Datahier <- genind2hierfstat(Data)
+wcpw <-pairwise.WCfst(Datahier, diploid = TRUE)
+wcpw<-lower(wcpw)
+#sites
+samples<-read_csv("RGAfiles/SitesUTM_noLD.csv")
+write.table(samples,file=paste0(write.dir,"samples.txt"),sep="\t",col.names=F,row.names=F)
+sample.locales <- SpatialPoints(samples[,c(2,3)])
+
+```
+
+##Single Surface Optimization
+```{r SS optim}
+tic()
+#Cond
+jl.inputs <- jl.prep(n.Pops = length(sample.locales),
+                     response = wcpw,
+                     CS_Point.File = sample.locales,
+                     JULIA_HOME = JULIA_HOME, cholmod = TRUE)
+GA.inputs <- GA.prep(ASCII.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/Cond/", Results.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/Cond/", max.cat = 100, max.cont = 100,
+parallel = 6)
+
+SS_RESULTS.gdist1 <- SS_optim(jl.inputs = jl.inputs,
+GA.inputs = GA.inputs)
+
+#NLCD
+jl.inputs <- jl.prep(n.Pops = length(sample.locales),
+                     response = wcpw,
+                     CS_Point.File = sample.locales,
+                     JULIA_HOME = JULIA_HOME, cholmod = TRUE)
+
+GA.inputs <- GA.prep(ASCII.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/NLCD/", Results.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/NLCD/", max.cat = 100, max.cont = 100,
+parallel = 6)
+
+
+SS_RESULTS.gdist3 <- SS_optim(jl.inputs = jl.inputs,
+GA.inputs = GA.inputs)
+
+
+#SS
+jl.inputs <- jl.prep(n.Pops = length(sample.locales),
+                     response = wcpw,
+                     CS_Point.File = sample.locales,
+                     JULIA_HOME = JULIA_HOME, cholmod = TRUE)
+GA.inputs <- GA.prep(ASCII.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/SS/", Results.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/SS/", max.cat = 100, max.cont = 100,
+parallel = 6)
+
+
+SS_RESULTS.gdist4 <- SS_optim(jl.inputs = jl.inputs,
+GA.inputs = GA.inputs)
+
+
+#Slope
+jl.inputs <- jl.prep(n.Pops = length(sample.locales),
+                     response = wcpw,
+                     CS_Point.File = sample.locales,
+                     JULIA_HOME = JULIA_HOME, cholmod = TRUE)
+GA.inputs <- GA.prep(ASCII.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/Slope/", Results.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/Slope/", max.cat = 100, max.cont = 100,
+parallel = 6)
+
+SS_RESULTS.gdist5 <- SS_optim(jl.inputs = jl.inputs,
+GA.inputs = GA.inputs)
+
+
+#Elev
+jl.inputs <- jl.prep(n.Pops = length(sample.locales),
+                     response = wcpw,
+                     CS_Point.File = sample.locales,
+                     JULIA_HOME = JULIA_HOME, cholmod = TRUE)
+GA.inputs <- GA.prep(ASCII.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/Elev/", Results.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD3/Elev/", max.cat = 100, max.cont = 100,
+parallel = 6)
+
+SS_RESULTS.gdist6 <- SS_optim(jl.inputs = jl.inputs,
+GA.inputs = GA.inputs)
+
+#Categorical raster
+#Culv
+jl.inputs <- jl.prep(n.Pops = length(sample.locales),
+                     response = wcpw,
+                     CS_Point.File = sample.locales,
+                     JULIA_HOME = JULIA_HOME, cholmod = TRUE)
+
+GA.inputs <- GA.prep(ASCII.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD/Culv/", Results.dir = "C:/Users/rwatson17/Desktop/Watson_OptCD/Culv/", max.cat = 100, max.cont = 100,
+parallel = 6)
+
+SS_RESULTS.gdist7 <- SS_optim(jl.inputs = jl.inputs,
+GA.inputs = GA.inputs)
+
+toc()
+#Run SS_optim twice to make sure you get the same outputs each time (compare ContinuousResults.csv s or CategoricalResults.csv s)
+```
+
+##Multi Surface Optimization
+```{r MS optim CS julia}
+
+# Directory to write .asc files and results
+write.dir<-"C:/Users/rwatson17/Desktop/Test5/"
+
+#Create raster stack
+r.stack<-stack(Culv,Cond,Elev,NLCD,Slope,SS)
+r.stack
+
+GA.inputs <- GA.prep(ASCII.dir = r.stack,
+Results.dir = write.dir,
+method = "LL",
+max.cat = 100,
+max.cont = 100,
+parallel = 12)
+
+jl.inputs <- jl.prep(n.Pops = length(sample.locales),
+                     response = wcpw,
+                     CS_Point.File = sample.locales,
+                     JULIA_HOME = JULIA_HOME, cholmod = TRUE)
+
+Multi.Surface_optim <- MS_optim(jl.inputs = jl.inputs,
+GA.inputs = GA.inputs)
+```
+
+```{r all comb}
+# Directory to write .asc files and results
+write.dir<-"C:/Users/rwatson17/Desktop/All/"
+#Create raster stack
+r.stack<-stack(Culv,Cond,Elev,NLCD,Slope,SS)
+
+GA.inputs <- GA.prep(ASCII.dir = r.stack,
+Results.dir = all.comb,
+method = "LL",
+max.cat = 100,
+max.cont = 100,
+parallel = 12)
+
+jl.inputs <- jl.prep(n.Pops = length(sample.locales),
+                     response = wcpw,
+                     CS_Point.File = sample.locales,
+                     JULIA_HOME = JULIA_HOME, cholmod = TRUE)
+
+all.comb<-all_comb(jl.inputs = jl.inputs,
+GA.inputs = GA.inputs,write.dir, max.combination = 6, dist_mod = FALSE)
+```
